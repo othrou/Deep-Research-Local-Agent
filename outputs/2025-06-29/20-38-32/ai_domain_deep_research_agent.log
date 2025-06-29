@@ -1,0 +1,44 @@
+[2025-06-29 20:38:32,145][__main__][INFO] - model:
+  COLLECTION_NAME: deepresearch agent
+  available_models:
+  - deepseek-r1:1.5b
+  - gemma3:1b
+  - llama3.2
+  - qwen2.5:1.5b
+  - gemma3:4b
+  model: llama3.2
+  temperature: 0.3
+processing:
+  pdf:
+    chunk_size: 1000
+    chunk_overlap: 200
+  web:
+    timeout: 30
+    max_retries: 3
+  similarity:
+    threshold: 0.7
+    max_results: 5
+web_search:
+  search_engine: duckduckgo
+  search_options:
+  - duckduckgo_search
+  - searxng_search
+
+[2025-06-29 20:38:32,145][__main__][INFO] - Using the model: deepresearch agent
+[2025-06-29 20:38:33,680][primp][INFO] - response: https://html.duckduckgo.com/html 200
+[2025-06-29 20:38:43,992][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:38:46,167][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"
+[2025-06-29 20:38:47,348][primp][INFO] - response: https://html.duckduckgo.com/html 200
+[2025-06-29 20:39:00,071][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:39:02,207][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"
+[2025-06-29 20:39:02,684][primp][INFO] - response: https://html.duckduckgo.com/html 202
+[2025-06-29 20:39:02,684][duckduckgo_search.DDGS][INFO] - Error to search using html backend: https://html.duckduckgo.com/html 202 Ratelimit
+[2025-06-29 20:39:05,214][primp][INFO] - response: https://lite.duckduckgo.com/lite/ 200
+[2025-06-29 20:39:18,276][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:39:20,351][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"
+[2025-06-29 20:39:21,567][primp][INFO] - response: https://html.duckduckgo.com/html 200
+[2025-06-29 20:39:33,473][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:39:35,726][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"
+[2025-06-29 20:39:37,266][primp][INFO] - response: https://lite.duckduckgo.com/lite/ 200
+[2025-06-29 20:39:47,123][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:39:49,242][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"

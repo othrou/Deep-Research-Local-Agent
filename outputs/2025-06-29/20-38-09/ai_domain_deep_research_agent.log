@@ -1,0 +1,29 @@
+[2025-06-29 20:38:09,343][__main__][INFO] - model:
+  COLLECTION_NAME: deepresearch agent
+  available_models:
+  - deepseek-r1:1.5b
+  - gemma3:1b
+  - llama3.2
+  - qwen2.5:1.5b
+  - gemma3:4b
+  model: llama3.2
+  temperature: 0.3
+processing:
+  pdf:
+    chunk_size: 1000
+    chunk_overlap: 200
+  web:
+    timeout: 30
+    max_retries: 3
+  similarity:
+    threshold: 0.7
+    max_results: 5
+web_search:
+  search_engine: duckduckgo
+  search_options:
+  - duckduckgo_search
+  - searxng_search
+
+[2025-06-29 20:38:09,343][__main__][INFO] - Using the model: deepresearch agent
+[2025-06-29 20:38:21,296][httpx][INFO] - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+[2025-06-29 20:38:23,938][httpx][INFO] - HTTP Request: POST https://api.agno.com/v1/telemetry/agent/run/create "HTTP/1.1 200 OK"

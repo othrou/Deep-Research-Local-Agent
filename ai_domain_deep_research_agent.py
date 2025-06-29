@@ -4,81 +4,31 @@ import streamlit as st
 from dotenv import load_dotenv
 from agno.agent import Agent
 from agno.models.ollama import Ollama
-from agno.tools.reasoning import ReasoningTools      # type: ignore
+from agno.tools.reasoning import ReasoningTools 
 
+import hydra
+import logging
+from omegaconf.omegaconf import OmegaConf
+from hydra.core.global_hydra import GlobalHydra
 
-
+# Import your custom modules
+from src.processing import extract_questions_after_think
+from src.tools import duckduckgo_search, searxng_search, save_report_as_html
 
 # Load environment variables
 load_dotenv()
 
-
-
-# Set page config
-st.set_page_config(
-    page_title="AI DeepResearch Agent",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-st.sidebar.header("🤖 Configuration")
-
-# Model Selection
-st.sidebar.header("📦 Model Selection")
-model_help = """
-- 1.5b: Lighter model, suitable for most laptops
-- 7b: More capable but requires better GPU/RAM
-
-Choose based on your hardware capabilities.
-"""
-
-st.sidebar.image("assets/logo.png", width=200)
-
-# Sidebar info
-st.sidebar.markdown("---")
-st.sidebar.markdown("### About")
-st.sidebar.info(
-    "This AI DeepResearch Agent application uses Ollama local models and some defined tools to perform comprehensive research on any topic. "
-    "It generates research questions, finds answers, and compiles a professional report."
-)
-
-st.sidebar.markdown("### Tools Used")
-st.sidebar.markdown("- 🔍 Tavily Search")
-st.sidebar.markdown("- 🧠 Perplexity AI")
-st.sidebar.markdown("- 📄 Google Docs Integration")
-
-# Initialize session state
-if 'questions' not in st.session_state:
-    st.session_state.questions = []
-if 'question_answers' not in st.session_state:
-    st.session_state.question_answers = []
-if 'report_content' not in st.session_state:
-    st.session_state.report_content = ""
-if 'research_complete' not in st.session_state:
-    st.session_state.research_complete = False
-
-# Main content
-st.title("🔍 AI DeepResearch Agent with Agno and Composio")
+logger = logging.getLogger(__name__)
 
 # Function to initialize the LLM and tools
-def initialize_agents(together_key, composio_key):
-    # Initialize Together AI LLM
-    llm = Together(id="Qwen/Qwen3-235B-A22B-fp8-tput", api_key=together_key)
-    
-    # Set up Composio tools
-    toolset = ComposioToolSet(api_key=composio_key)
-    composio_tools = toolset.get_tools(actions=[
-        Action.COMPOSIO_SEARCH_TAVILY_SEARCH, 
-        Action.PERPLEXITYAI_PERPLEXITY_AI_SEARCH, 
-        Action.GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN
-    ])
-    
-    return llm, composio_tools
+def initialize_agents(selected_model, search_tools):
+    """Initialize the LLM with the selected model"""
+    llm = Ollama(id=selected_model)  # Fixed: use selected_model instead of "selected_model"
+    return llm, search_tools
 
 # Function to create agents
-def create_agents(llm, composio_tools):
-    # Create the question generator agent
+def create_agents(llm, search_tools):
+    """Create the question generator agent"""
     question_generator = Agent(
         name="Question Generator",
         model=llm,
@@ -88,18 +38,12 @@ def create_agents(llm, composio_tools):
         Respond ONLY with the text of the 5 questions formatted as a numbered list, and NOTHING ELSE.
         """
     )
-    
     return question_generator
 
-# Function to extract questions after think tag
-def extract_questions_after_think(text):
-    if "</think>" in text:
-        return text.split("</think>", 1)[1].strip()
-    return text.strip()
-
 # Function to generate research questions
-def generate_questions(llm, composio_tools, topic, domain):
-    question_generator = create_agents(llm, composio_tools)
+def generate_questions(llm, search_tools, topic, domain):
+    """Generate research questions for the given topic and domain"""
+    question_generator = create_agents(llm, search_tools)
     
     with st.spinner("🤖 Generating research questions..."):
         questions_task = question_generator.run(
@@ -114,28 +58,58 @@ def generate_questions(llm, composio_tools, topic, domain):
         return questions_list
 
 # Function to research a specific question
-def research_question(llm, composio_tools, topic, domain, question):
-    research_task = Agent(
+def research_question(llm, search_tools, topic, domain, question):
+    """Research a specific question using available search tools"""
+    # Create a simple search function that uses your tools
+    def search_function(query):
+        # Use both DuckDuckGo and SearXNG for comprehensive results
+        ddg_results = duckduckgo_search(query, max_results=3)
+        searx_results = searxng_search(query, max_results=3)
+        
+        # Combine results
+        all_results = ddg_results.get('results', []) + searx_results.get('results', [])
+        return all_results
+    
+    research_agent = Agent(
+        name="Research Agent",
         model=llm,
-        tools=[composio_tools],
-        instructions=f"You are a sophisticated research assistant. Answer the following research question about the topic '{topic}' in the domain '{domain}':\n\n{question}\n\nUse the PERPLEXITYAI_PERPLEXITY_AI_SEARCH and COMPOSIO_SEARCH_TAVILY_SEARCH tools to provide a concise, well-sourced answer."
-    )
+        instructions=f"""
+        You are a sophisticated research assistant. Answer the following research question about the topic '{topic}' in the domain '{domain}':
 
-    research_result = research_task.run()
+        {question}
+
+        Use the available search tools to find relevant information and provide a concise, well-sourced answer.
+        Include specific facts, statistics, and cite sources where possible.
+        """
+    )
+    
+    # Perform search and get results
+    search_query = f"{topic} {domain} {question}"
+    search_results = search_function(search_query)
+    
+    # Format search results for the agent
+    formatted_results = "\n".join([
+        f"Title: {result.get('title', 'N/A')}\nURL: {result.get('url', 'N/A')}\nContent: {result.get('content', 'N/A')}\n"
+        for result in search_results[:5]  # Limit to top 5 results
+    ])
+    
+    research_result = research_agent.run(
+        f"Based on the following search results, answer the question: {question}\n\nSearch Results:\n{formatted_results}"
+    )
     return research_result.content
 
 # Function to compile final report
-def compile_report(llm, composio_tools, topic, domain, question_answers):
-    with st.spinner("📝 Compiling final report and creating Google Doc..."):
+def compile_report(llm, search_tools, topic, domain, question_answers):
+    """Compile the final research report"""
+    with st.spinner("📝 Compiling final report..."):
         qa_sections = "\n".join(
             f"<h2>{idx+1}. {qa['question']}</h2>\n<p>{qa['answer']}</p>" 
             for idx, qa in enumerate(question_answers)
         )
         
-        compile_report_task = Agent(
+        report_compiler = Agent(
             name="Report Compiler",
             model=llm,
-            tools=[composio_tools],
             instructions=f"""
             You are a sophisticated research assistant. Compile the following research findings into a professional, McKinsey-style report. The report should be structured as follows:
 
@@ -151,118 +125,200 @@ def compile_report(llm, composio_tools, topic, domain, question_answers):
             Research Questions and Findings (for your reference):
             {qa_sections}
 
-            Use the GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN tool to create a Google Doc with the report. The text should be in HTML format. You have to create the google document with all the compiled info. You have to do it.
+            Create a comprehensive, professional report in HTML format.
             """
         )
         
-        compile_result = compile_report_task.run()
-        st.session_state.report_content = compile_result.content
+        compile_result = report_compiler.run()
+        report_content = compile_result.content
+        
+        # Save report to local file
+        report_title = f"{topic}_{domain}_research_report"
+        save_result = save_report_as_html(report_title, report_content)
+        st.success(f"Report compiled successfully! {save_result}")
+        
+        st.session_state.report_content = report_content
         st.session_state.research_complete = True
-        return compile_result.content
+        return report_content
 
-# Main application flow
-if together_api_key and composio_api_key:
-    # Initialize agents
-    llm, composio_tools = initialize_agents(together_api_key, composio_api_key)
+@hydra.main(config_path="./config", config_name="config", version_base=None)
+def main(cfg):
+    """Main application function"""
+    logger.info(OmegaConf.to_yaml(cfg, resolve=True))
+    logger.info(f"Using the model: {cfg.model.COLLECTION_NAME}")
     
-    # Main content area
-    st.header("Research Topic")
+    # Constants
+    COLLECTION_NAME = cfg.model.COLLECTION_NAME
+    search_tools = cfg.web_search.search_options
+
+    # Initialize session state
+    if 'questions' not in st.session_state:
+        st.session_state.questions = []
+    if 'question_answers' not in st.session_state:
+        st.session_state.question_answers = []
+    if 'report_content' not in st.session_state:
+        st.session_state.report_content = ""
+    if 'research_complete' not in st.session_state:
+        st.session_state.research_complete = False
+    if 'model_version' not in st.session_state:
+        st.session_state.model_version = cfg.model.model
+
+    # Set page config
+    st.set_page_config(
+        page_title="AI DeepResearch Agent",
+        page_icon="🔍",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    st.title("🔍 AI DeepResearch Agent with Agno and Ollama")
+
+    ##################### Sidebar configuration #####################
+    if os.path.exists("assets/logo.png"):
+        st.sidebar.image("assets/logo.png", width=200)
+
+    st.sidebar.header("🤖 Configuration")
+
+    # Model Selection
+    st.sidebar.header("📦 Model Selection")
+
+    model_help = """
+    - 1.5b: Lighter model, suitable for most laptops
+    - 4b: More capable but requires better GPU/RAM
+
+    Choose based on your hardware capabilities.
+    """
+
+    st.session_state.model_version = st.sidebar.selectbox(
+        "Select Model Version",
+        options=list(cfg.model.available_models),
+        help=model_help
+    )
+
+    # Sidebar info
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### About")
+    st.sidebar.info(
+        "This AI DeepResearch Agent application uses Ollama local models and search tools to perform comprehensive research on any topic. "
+        "It generates research questions, finds answers, and compiles a professional report."
+    )
+
+    st.sidebar.markdown("### Search Tools Used")
+    st.sidebar.markdown("- 🦆 DuckDuckGo Search")
+    st.sidebar.markdown("- 🌀 SearXNG Search")
+
+    #############################################################################################
+
+    # Check if required environment variables are set
+    required_env_vars = ["SEARXNG_URL"]  # Add other required env vars as needed
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     
-    # Input fields
-    col1, col2 = st.columns(2)
-    with col1:
-        topic = st.text_input("What topic would you like to research?", placeholder="Morocco's Economic Growth")
-    with col2:
-        domain = st.text_input("What domain is this topic in?", placeholder="National, Regional, Technology, etc.")
-    
-    # Generate questions section
-    if topic and domain and st.button("Generate Research Questions", key="generate_questions"):
-        # Generate questions
-        questions = generate_questions(llm, composio_tools, topic, domain)
+    if not missing_vars:
+        # Initialize agents
+        llm, search_tools_config = initialize_agents(st.session_state.model_version, search_tools)
         
-        # Display the generated questions
-        st.header("Research Questions")
-        for i, question in enumerate(questions):
-            st.markdown(f"**{i+1}. {question}**")
-    
-    # Research section - only show if we have questions
-    if st.session_state.questions and st.button("Start Research", key="start_research"):
-        st.header("Research Results")
+        # Main content area
+        st.header("Research Topic")
         
-        # Reset answers
-        question_answers = []
+        # Input fields
+        col1, col2 = st.columns(2)
+        with col1:
+            topic = st.text_input("What topic would you like to research?", placeholder="Morocco's Economic Growth")
+        with col2:
+            domain = st.text_input("What domain is this topic in?", placeholder="National, Regional, Technology, etc.")
         
-        # Research each question
-        progress_bar = st.progress(0)
-        
-        for i, question in enumerate(st.session_state.questions):
-            # Update progress
-            progress_bar.progress((i) / len(st.session_state.questions))
+        # Generate questions section
+        if topic and domain and st.button("Generate Research Questions", key="generate_questions"):
+            # Generate questions
+            questions = generate_questions(llm, search_tools_config, topic, domain)
             
-            # Research the question
-            with st.spinner(f"🔍 Researching question {i+1}..."):
-                answer = research_question(llm, composio_tools, topic, domain, question)
-                question_answers.append({"question": question, "answer": answer})
-            
-            # Display the answer
-            st.subheader(f"Question {i+1}:")
-            st.markdown(f"**{question}**")
-            st.markdown(answer)
-            
-            # Update progress again
-            progress_bar.progress((i + 1) / len(st.session_state.questions))
+            # Display the generated questions
+            st.header("Research Questions")
+            for i, question in enumerate(questions):
+                st.markdown(f"**{i+1}. {question}**")
         
-        # Store the answers
-        st.session_state.question_answers = question_answers
-        
-        # Compile report button
-        if st.button("Compile Final Report", key="compile_report"):
-            report_content = compile_report(llm, composio_tools, topic, domain, question_answers)
+        # Research section - only show if we have questions
+        if st.session_state.questions and st.button("Start Research", key="start_research"):
+            st.header("Research Results")
+            
+            # Reset answers
+            question_answers = []
+            
+            # Research each question
+            progress_bar = st.progress(0)
+            
+            for i, question in enumerate(st.session_state.questions):
+                # Update progress
+                progress_bar.progress((i) / len(st.session_state.questions))
+                
+                # Research the question
+                with st.spinner(f"🔍 Researching question {i+1}..."):
+                    answer = research_question(llm, search_tools_config, topic, domain, question)
+                    question_answers.append({"question": question, "answer": answer})
+                
+                # Display the answer
+                st.subheader(f"Question {i+1}:")
+                st.markdown(f"**{question}**")
+                st.markdown(answer)
+                
+                # Update progress again
+                progress_bar.progress((i + 1) / len(st.session_state.questions))
+            
+            # Store the answers
+            st.session_state.question_answers = question_answers
+            
+        # Compile report button - show if we have answers
+        if st.session_state.question_answers and st.button("Compile Final Report", key="compile_report"):
+            report_content = compile_report(llm, search_tools_config, topic, domain, st.session_state.question_answers)
             
             # Display the report content
             st.header("Final Report")
-            st.success("Your report has been compiled and a Google Doc has been created.")
             
             # Show the full report content
             with st.expander("View Full Report Content", expanded=True):
-                st.markdown(report_content)
-    
-    # Display previous results if available
-    if len(st.session_state.question_answers) > 0 and not st.session_state.research_complete:
-        st.header("Previous Research Results")
+                st.markdown(report_content, unsafe_allow_html=True)
         
-        # Display research results
-        for i, qa in enumerate(st.session_state.question_answers):
-            with st.expander(f"Question {i+1}: {qa['question']}"):
-                st.markdown(qa['answer'])
-    
-    # Display final report if available
-    if st.session_state.research_complete and st.session_state.report_content:
-        st.header("Final Report")
+        # Display previous results if available
+        if len(st.session_state.question_answers) > 0 and not st.session_state.research_complete:
+            st.header("Previous Research Results")
+            
+            # Display research results
+            for i, qa in enumerate(st.session_state.question_answers):
+                with st.expander(f"Question {i+1}: {qa['question']}"):
+                    st.markdown(qa['answer'])
         
-        # Display the report content
-        st.success("Your report has been compiled and a Google Doc has been created.")
-        
-        # Show the full report content
-        with st.expander("View Full Report Content", expanded=True):
-            st.markdown(st.session_state.report_content)
+        # Display final report if available
+        if st.session_state.research_complete and st.session_state.report_content:
+            st.header("Final Report")
+            
+            # Display the report content
+            st.success("Your report has been compiled and saved locally.")
+            
+            # Show the full report content
+            with st.expander("View Full Report Content", expanded=True):
+                st.markdown(st.session_state.report_content, unsafe_allow_html=True)
 
-else:
-    # API keys not provided
-    st.warning("⚠️ Please enter your Together AI and Composio API keys in the sidebar to get started.")
-    
-    # Example UI
-    st.header("How It Works")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.subheader("1️⃣ Define Topic")
-        st.write("Enter your research topic and domain to begin the research process.")
-    
-    with col2:
-        st.subheader("2️⃣ Generate Questions")
-        st.write("The AI generates specific research questions to explore your topic in depth.")
+    else:
+        # Missing environment variables
+        st.warning(f"⚠️ Please set the following environment variables: {', '.join(missing_vars)}")
         
-    with col3:
-        st.subheader("3️⃣ Compile Report")
-        st.write("Research findings are compiled into a professional report and saved to Google Docs.")
+        # Example UI
+        st.header("How It Works")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.subheader("1️⃣ Define Topic")
+            st.write("Enter your research topic and domain to begin the research process.")
+        
+        with col2:
+            st.subheader("2️⃣ Generate Questions")
+            st.write("The AI generates specific research questions to explore your topic in depth.")
+            
+        with col3:
+            st.subheader("3️⃣ Compile Report")
+            st.write("Research findings are compiled into a professional report and saved locally.")
+
+if __name__ == "__main__":
+    
+    GlobalHydra.instance().clear() # Clear any previous configurations sinon il y'a erreur disant qu'il y'a déja une instance qui fonctionne.
+    main()
