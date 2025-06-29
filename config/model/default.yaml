@@ -1,0 +1,14 @@
+# Model configurations
+
+COLLECTION_NAME : "deepresearch agent"
+
+available_models:
+  - "deepseek-r1:1.5b"
+  - "gemma3:1b"
+  - "llama3.2"
+  - "qwen2.5:1.5b"
+  - "gemma3:4b"
+
+model: "llama3.2"
+
+temperature: 0.3

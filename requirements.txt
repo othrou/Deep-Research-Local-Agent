@@ -1,6 +1,4 @@
-composio
 agno
 streamlit
-composio-agno
-together
 ollama
+markdownify

@@ -1,0 +1,10 @@
+# Default web search configuration
+use_web_search: false
+exa_api_key: ""
+#custom_domains: ["arxiv.org", "wikipedia.org", "github.com", "medium.com"] --> not working
+
+custom_domains:
+  - "arxiv.org"
+  - "wikipedia.org"
+  - "github.com"
+  - "medium.com"

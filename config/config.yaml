@@ -1,0 +1,11 @@
+defaults:
+  - model: default
+  - training: default
+  - processing: default
+  - web_search : default
+
+
+
+
+
+

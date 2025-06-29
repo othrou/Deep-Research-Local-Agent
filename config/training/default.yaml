@@ -1,0 +1,4 @@
+# Training configurations (placeholder for future use) --> i will see if i will be able to fine tune a custom model and add it to ollama
+batch_size: 32
+learning_rate: 0.001
+epochs: 10

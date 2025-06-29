@@ -3,11 +3,8 @@ import asyncio
 import streamlit as st
 from dotenv import load_dotenv
 from agno.agent import Agent
-from composio_agno import ComposioToolSet, Action
-from agno.models.together import Together
 from agno.models.ollama import Ollama
-from agno.tools.duckduckgo import DuckDuckGoTools
-from agno.tools.reasoning import ReasoningTools     
+from agno.tools.reasoning import ReasoningTools      # type: ignore
 
 
 
@@ -25,10 +22,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Sidebar for API keys
-st.sidebar.header("⚙️ Configuration")
+st.sidebar.header("🤖 Configuration")
 
-st.logo("logo.png", width=100)
+# Model Selection
+st.sidebar.header("📦 Model Selection")
+model_help = """
+- 1.5b: Lighter model, suitable for most laptops
+- 7b: More capable but requires better GPU/RAM
+
+Choose based on your hardware capabilities.
+"""
+
+st.sidebar.image("assets/logo.png", width=200)
 
 # Sidebar info
 st.sidebar.markdown("---")
