@@ -3,3 +3,4 @@ agno
 streamlit
 composio-agno
 together
+ollama

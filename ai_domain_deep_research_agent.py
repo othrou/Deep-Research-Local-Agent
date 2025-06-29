@@ -5,6 +5,11 @@ from dotenv import load_dotenv
 from agno.agent import Agent
 from composio_agno import ComposioToolSet, Action
 from agno.models.together import Together
+from agno.models.ollama import Ollama
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.reasoning import ReasoningTools     
+
+
 
 
 # Load environment variables
@@ -23,26 +28,13 @@ st.set_page_config(
 # Sidebar for API keys
 st.sidebar.header("⚙️ Configuration")
 
-# API key inputs
-together_api_key = st.sidebar.text_input(
-    "Together AI API Key", 
-    value=os.getenv("TOGETHER_API_KEY", ""),
-    type="password",
-    help="Get your API key from https://together.ai"
-)
-
-composio_api_key = st.sidebar.text_input(
-    "Composio API Key", 
-    value=os.getenv("COMPOSIO_API_KEY", ""),
-    type="password",
-    help="Get your API key from https://composio.ai"
-)
+st.logo("logo.png", width=100)
 
 # Sidebar info
 st.sidebar.markdown("---")
 st.sidebar.markdown("### About")
 st.sidebar.info(
-    "This AI DeepResearch Agent uses Together AI's Qwen model and Composio tools to perform comprehensive research on any topic. "
+    "This AI DeepResearch Agent application uses Ollama local models and some defined tools to perform comprehensive research on any topic. "
     "It generates research questions, finds answers, and compiles a professional report."
 )
 
