@@ -2,3 +2,5 @@ agno
 streamlit
 ollama
 markdownify
+duckduckgo_search
+tavily-python
